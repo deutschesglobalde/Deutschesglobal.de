@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>User Dashboard</title>
+<link rel="stylesheet" href="/assets/css/styles.css">
+<script type="module" src="/_integration/supabase.js"></script>
+</head>
+<body>
+<main class="container">
+  <h1>User Dashboard</h1>
+  <p>Welcome, <span id="userName"></span></p>
+  <div id="balance" class="card">Balance: <span id="balVal">0</span></div>
+  <section id="txs" class="card"><h3>Transactions</h3><div id="txList">Loading...</div></section>
+  <form id="txForm" class="card">
+    <select id="txType"><option>deposit</option><option>withdrawal</option></select>
+    <input id="txAmount" type="number" placeholder="Amount" required>
+    <button class="btn primary" type="submit">Add Transaction</button>
+  </form>
+  <button id="logout" class="btn">Logout</button>
+</main>
+<script type="module">
+import { selectWithFallback, insertWithFallback } from '/_integration/supabase.js'
+async function load() {
+  const email = localStorage.getItem('dg_user_email')
+  if (!email) return window.location.href = '/index.html'
+  const { data: users } = await selectWithFallback('users', { email })
+  const user = (users && users[0]) || JSON.parse(localStorage.getItem('dg_users')||'[]')[0] || null
+  document.getElementById('userName').innerText = user ? user.full_name : email
+  document.getElementById('balVal').innerText = user ? user.balance : (user && user.balance) || 0
+  const { data: txs } = await selectWithFallback('transactions', { user_id: user ? user.id : null })
+  const list = document.getElementById('txList')
+  if (!txs || txs.length===0) list.innerHTML = '<p>No transactions yet</p>'
+  else list.innerHTML = txs.map(t=>`<div class="tx"><b>${t.type}</b> ₦${t.amount} — ${t.created_at}</div>`).join('')
+  document.getElementById('txForm').addEventListener('submit', async (e)=>{
+    e.preventDefault()
+    const type = document.getElementById('txType').value
+    const amount = Number(document.getElementById('txAmount').value)
+    const tx = { id: 'tx-'+Date.now(), user_id: user ? user.id : null, type, amount, created_at: new Date().toISOString() }
+    await insertWithFallback('transactions', tx)
+    // append locally
+    const cur = JSON.parse(localStorage.getItem('dg_transactions')||'[]')
+    cur.unshift(tx)
+    localStorage.setItem('dg_transactions', JSON.stringify(cur))
+    load()
+  })
+  document.getElementById('logout').addEventListener('click', ()=> { localStorage.removeItem('dg_user_email'); window.location.href='/index.html' })
+}
+load()
+</script>
+</body>
+</html>

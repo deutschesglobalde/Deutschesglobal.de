@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin Dashboard</title>
+<link rel="stylesheet" href="/assets/css/styles.css">
+<script type="module" src="/_integration/supabase.js"></script>
+</head>
+<body>
+<main class="container">
+  <h1>Admin Console</h1>
+  <div id="users" class="card">Loading users...</div>
+  <h3>Create user</h3>
+  <form id="createUser" class="card">
+    <input id="cu_email" placeholder="Email" required>
+    <input id="cu_name" placeholder="Full name">
+    <input id="cu_pass" placeholder="Password" required>
+    <button type="submit" class="btn">Create</button>
+  </form>
+  <button id="logout" class="btn">Logout</button>
+</main>
+<script type="module">
+import { selectWithFallback, insertWithFallback } from '/_integration/supabase.js'
+async function load() {
+  const email = localStorage.getItem('dg_admin_email')
+  if (!email) return window.location.href = '/index.html'
+  const { data: users } = await selectWithFallback('users')
+  const list = document.getElementById('users')
+  if (!users || users.length===0) list.innerHTML = '<p>No users</p>'
+  else list.innerHTML = users.map(u=>`<div><b>${u.full_name||'User'}</b> — ${u.email} <button data-id="${u.id}" class="del">Delete</button></div>`).join('')
+  document.querySelectorAll('.del').forEach(b=>b.addEventListener('click', async (ev)=>{
+    const id = ev.target.getAttribute('data-id')
+    // local deletion for fallback
+    let cur = JSON.parse(localStorage.getItem('dg_users')||'[]')
+    cur = cur.filter(x=>x.id !== id)
+    localStorage.setItem('dg_users', JSON.stringify(cur))
+    load()
+  }))
+  document.getElementById('createUser').addEventListener('submit', async (e)=>{
+    e.preventDefault()
+    const u = { id: 'user-'+Date.now(), email: document.getElementById('cu_email').value, full_name: document.getElementById('cu_name').value, password: document.getElementById('cu_pass').value, balance: 0, created_at: new Date().toISOString() }
+    await insertWithFallback('users', u)
+    const cur = JSON.parse(localStorage.getItem('dg_users')||'[]'); cur.unshift(u); localStorage.setItem('dg_users', JSON.stringify(cur))
+    load()
+  })
+  document.getElementById('logout').addEventListener('click', ()=> { localStorage.removeItem('dg_admin_email'); window.location.href='/index.html' })
+}
+load()
+</script>
+</body>
+</html>
